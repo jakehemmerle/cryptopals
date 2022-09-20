@@ -2,6 +2,8 @@ use std::env;
 use std::fs;
 
 pub mod set1 {
+    use super::*;
+
     #[test]
     fn hex_encode_decode() {
         // convert hex to base64
@@ -26,6 +28,7 @@ pub mod set1 {
     }
 
     #[test]
+    #[ignore = "not yet implemented"]
     fn single_xor_cipher() {
         use std::collections::HashMap;
 
@@ -124,7 +127,10 @@ pub mod set1 {
 }
 
 mod repeating_key_xor {
-    use itertools::Itertools;
+    use crate::vigenere_breaker::*;
+    use itertools::{Chunks, Itertools};
+    use std::collections::HashMap;
+    use std::convert::TryInto;
 
     #[test]
     fn hamming_distance_demo() {
@@ -137,31 +143,16 @@ mod repeating_key_xor {
         assert_eq!(hamming_distance(bytes1, bytes2), 37);
     }
 
-    fn hamming_distance(bytes1: &[u8], bytes2: &[u8]) -> usize {
-        bytes1.iter().zip(bytes2.iter()).fold(0, |acc, (a, b)| {
-            let mut distance: usize = 0;
-            let mut xor = a ^ b;
-            while xor > 0 {
-                if xor & 1 == 1 {
-                    distance += 1;
-                }
-                xor >>= 1;
-            }
-            acc + distance
-        })
+    fn get_ciphertext() -> Vec<u8> {
+        use std::fs;
+        let file = fs::read_to_string("6.txt").expect("Should have been able to read the file");
+        base64::decode(file.replace("\n", "")).unwrap()
     }
-
-    // fn hamming_distance_of_
 
     #[test]
     fn find_key_length() {
-        use itertools::{Chunks, Itertools};
-        use std::collections::HashMap;
-        use std::fs;
-
         // parse file
-        let file = fs::read_to_string("6.txt").expect("Should have been able to read the file");
-        let ciphertext = base64::decode(file.replace("\n", "")).unwrap();
+        let ciphertext = get_ciphertext();
 
         // create map for key length to hamming distance
         let mut distance: HashMap<usize, f32> = HashMap::new();
@@ -208,6 +199,26 @@ mod repeating_key_xor {
         println!("Other highest weights:");
         sorted_normalized_weights.for_each(|(a, b)| println!("{:?}: {:?}", a, b));
     }
+
+    /// Returns the most likely encrypted character based on the hamming distances between the blocks
+    fn brute_force_column(column: &[u8]) -> char {
+        'c'
+    }
+
+    #[test]
+    fn brute_force_keys() {
+        let mut ciphertext = get_ciphertext();
+        const KEYSIZE: usize = 29;
+        let chunks_as_keylength = ciphertext.chunks(KEYSIZE).collect_vec(); // .collect_vec();
+
+        let mut columns: Vec<Vec<u8>> = transpose(chunks_as_keylength.clone());
+
+        // solve each column as a ceaser cipher with lowest hamming distance between them
+        let mut potential_keys: Vec<char> = columns
+            .iter()
+            .map(|column| brute_force_column(column.as_slice()))
+            .collect();
+    }
 }
 
 /*
@@ -217,3 +228,42 @@ public channels
 - usenet
 
  */
+
+pub mod vigenere_breaker {
+    /// Computes the hamming distance of two byte arrays of equal length
+    /// TODO: make this weighted to return based on length of the array
+    pub fn hamming_distance(bytes1: &[u8], bytes2: &[u8]) -> usize {
+        assert!(bytes1.len() == bytes2.len());
+        bytes1.iter().zip(bytes2.iter()).fold(0, |acc, (a, b)| {
+            let mut distance: usize = 0;
+            let mut xor = a ^ b;
+            while xor > 0 {
+                if xor & 1 == 1 {
+                    distance += 1;
+                }
+                xor >>= 1;
+            }
+            acc + distance
+        })
+    }
+
+    /// Transpose Chunks -> .collect_vec() to a Vec of vecs
+    pub fn transpose<T>(v: Vec<&[T]>) -> Vec<Vec<T>>
+    where
+        T: Clone,
+    {
+        let mut transposed = vec![vec![]; v[0].len()];
+
+        for row in v {
+            for (i, col) in row.iter().enumerate() {
+                transposed[i].push(col.clone());
+            }
+        }
+
+        transposed
+    }
+}
+
+fn main() {
+    unimplemented!()
+}
