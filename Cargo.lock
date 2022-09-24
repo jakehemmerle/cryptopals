@@ -83,6 +83,7 @@ dependencies = [
  "base64",
  "hex",
  "itertools",
+ "libmath",
  "log",
  "nalgebra",
  "rust-crypto",
@@ -145,6 +146,15 @@ name = "libc"
 version = "0.2.132"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8371e4e5341c3a96db127eb2465ac681ced4c433e01dd0e938adbef26ba93ba5"
+
+[[package]]
+name = "libmath"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dfd3416934a853ae80d5c3b006f632dfcbaf320300c5167e88a469e9ac214502"
+dependencies = [
+ "rand 0.3.23",
+]
 
 [[package]]
 name = "log"
