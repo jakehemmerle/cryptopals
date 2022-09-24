@@ -49,7 +49,7 @@ pub mod set1 {
                 "{}: {}: {}",
                 i as char,
                 xord_string,
-                delta_from_average_english_character_frequency(xord_string.as_bytes())
+                delta_from_english(xord_string.as_bytes())
             );
             xord_strings.push(xord_string);
         }
@@ -86,13 +86,8 @@ mod repeating_key_xor {
     }
 
     fn get_dummy_ciphertext() -> Vec<u8> {
+        // some random sentence I made up with a key of "CAT"
         hex::decode("1729316330212a223f6323262c363a63273b3b613e362c242625742c37313161202b24742f202d63253b246f740a6123222f2063353b6323316320362f2474372e742f282226613d2d613563253b332474332d352024742a2f740d181763363d372974092e3c2d6f740a66396331262635203a613236223f2a2f336332202c2a31276f7417293d30613d3061332c283a2461202c613626613563262626202063353d2e247a".to_string()).unwrap()
-    }
-
-    #[derive(Debug)]
-    pub struct SingleKeyXorResults {
-        decrypted_ciphertext: HashMap<char, Vec<u8>>,
-        char_score: HashMap<char, f32>,
     }
 
     #[test]
@@ -105,17 +100,47 @@ mod repeating_key_xor {
     }
 
     #[test]
-    fn test_brute_force_keys() {
+    fn brute_force_dummy_data() {
         let ciphertext = get_dummy_ciphertext();
-        let key_length = 3;
-        brute_force_keys(&ciphertext.as_slice(), key_length);
+        let key_lengths = guess_key_length(&ciphertext);
+
+        for key_length in key_lengths {
+            let (plaintext, key) = brute_force_ciphertext(&ciphertext.as_slice(), key_length);
+
+            // print potential key as bytes and as chars
+            println!(
+                "KEY:\n\"{}\"\n{:?}\n",
+                String::from_utf8(key.clone()).unwrap_or("can't be parsed as string".to_string()),
+                key
+            );
+
+            // print the plaintext
+            println!(
+                "PLAINTEXT:\n{}",
+                String::from_utf8(plaintext).unwrap_or("can't be parsed as string".to_string())
+            );
+        }
     }
 
     #[test]
-    fn break_known_xor() {
-        use std::fs;
-        let file = fs::read_to_string("test.txt").expect("Should have been able to read the file");
-        let key = "USEXORA";
+    fn brute_force_real_data() {
+        let ciphertext = get_ciphertext();
+        let key_lengths = guess_key_length(&ciphertext);
+
+        let (plaintext, key) = brute_force_ciphertext(&ciphertext.as_slice(), key_lengths[0]);
+
+        // print potential key as bytes and as chars
+        println!(
+            "KEY:\n\"{}\"\n{:?}\n",
+            String::from_utf8(key.clone()).unwrap_or("can't be parsed as string".to_string()),
+            key
+        );
+
+        // print the plaintext
+        println!(
+            "PLAINTEXT:\n{}",
+            String::from_utf8(plaintext).unwrap_or("can't be parsed as string".to_string())
+        );
     }
 }
 
@@ -131,7 +156,7 @@ pub mod vigenere_breaker {
     use super::utils::*;
     use std::collections::HashMap;
 
-    pub fn find_key_length(ciphertext: &[u8]) {
+    pub fn guess_key_length(ciphertext: &[u8]) -> Vec<u8> {
         use itertools::Itertools;
         // create map for key length to hamming distance
         let mut distance: HashMap<usize, f32> = HashMap::new();
@@ -171,12 +196,17 @@ pub mod vigenere_breaker {
             .iter()
             .sorted_by(|a, b| a.1.partial_cmp(b.1).unwrap());
 
-        println!(
-            "Most likely key length: {:?}",
-            sorted_normalized_weights.next().unwrap()
-        );
-        println!("Other highest weights:");
-        sorted_normalized_weights.for_each(|(a, b)| println!("{:?}: {:?}", a, b));
+        let mut top_lengths: Vec<u8> = vec![];
+        for _ in 0..3 {
+            top_lengths.push(*sorted_normalized_weights.next().unwrap().0 as u8);
+        }
+        top_lengths
+        // println!(
+        //     "Most likely key length: {:?}",
+        //     sorted_normalized_weights.next().unwrap()
+        // );
+        // println!("Other highest weights:");
+        // sorted_normalized_weights.for_each(|(a, b)| println!("{:?}: {:?}", a, b));
     }
 
     /// Computes the hamming distance of two byte arrays of equal length
@@ -196,12 +226,144 @@ pub mod vigenere_breaker {
         })
     }
 
+    /// statistical likelihood that a potential ciphertext is english based on letter frequency;
+    /// lower means higher likelyhood of ciphertext being the plaintext
+    pub fn delta_from_english(potential_plaintext_column: &[u8]) -> f32 {
+        // println!(
+        //     "potential_plaintext: {}",
+        //     String::from_utf8(potential_plaintext.to_owned()).unwrap_or("shit!".to_string())
+        // );
+        let mut overall_delta = 0.0f32;
+        let mut char_count = HashMap::with_capacity(26);
+
+        // get frequency of each letter
+        for letter in potential_plaintext_column {
+            let mut letter_count = char_count.entry(*letter).or_insert(0f32);
+            *letter_count += 1f32;
+        }
+
+        // print number of valid characters
+        // println!(
+        //     "Number of valid characters: {}",
+        //     potential_plaintext.len() - invalid_characters
+        // );
+        // println!("INVALID CHARACTERS: {:?}", invalid_characters);
+
+        // normalize count
+        for count in char_count.values_mut() {
+            *count /= (potential_plaintext_column.len()) as f32;
+        }
+
+        // compute and return delta
+        // TODO absolute value
+        for (letter, frequency) in char_count.drain() {
+            let mut single_char_delta = character_frequency(letter) - frequency;
+
+            if single_char_delta < 0f32 {
+                single_char_delta *= -1f32;
+            }
+
+            // println!(
+            //     "CHAR: {}, FREQ: {}, EXPECTED_FREQ: {}, DELTA: {}",
+            //     letter as char,
+            //     frequency,
+            //     character_frequency(letter),
+            //     single_char_delta,
+            // );
+
+            overall_delta += single_char_delta
+        }
+
+        overall_delta
+    }
+
+    /// Returns the most likely character of a single key xor'd ciphertext based on the frequency of letters
+    pub fn guess_xord_key(ciphertext: &[u8]) -> u8 {
+        // new map storing char to english word score
+        let mut char_score = HashMap::with_capacity(255);
+        let mut decrypted_ciphertext = HashMap::with_capacity(255);
+
+        // insert char and score distance of unedited ciphertext
+        let mut highest_score_key = 0u8;
+        let mut highest_score = delta_from_english(ciphertext.into());
+        char_score.insert(highest_score_key, highest_score);
+
+        // insert key and score of ciphertext xor every key 'a' through 'Z'
+        for potential_key in 0..=255 as u8 {
+            let potential_plaintext = ciphertext
+                .to_owned()
+                .iter()
+                .map(|letter| (*letter as u8 ^ potential_key))
+                .collect::<Vec<u8>>();
+
+            decrypted_ciphertext.insert(potential_key, potential_plaintext.clone());
+
+            let potential_key_score = delta_from_english(potential_plaintext.as_slice());
+            if potential_key_score < highest_score {
+                highest_score_key = potential_key;
+                highest_score = potential_key_score;
+            }
+
+            char_score.insert(potential_key, potential_key_score);
+        }
+
+        let highest_key_ciphertext = decrypted_ciphertext
+            .get(&highest_score_key)
+            .unwrap()
+            .to_owned();
+
+        // decrypted_ciphertext.drain().for_each(|(key, value)| {
+        //     println!(
+        //         "KEY {}: DELTA: {}, TEXT: {}",
+        //         key,
+        //         delta_from_average_english_character_frequency(value.as_slice()),
+        //         String::from_utf8(value).unwrap_or("".to_string()),
+        //     );
+        // });
+
+        // println!(
+        //     "HIGHEST CHAR SCORE and test: {}, {}, {}",
+        //     highest_score_key,
+        //     highest_score,
+        //     String::from_utf8(highest_key_ciphertext).unwrap_or("default".to_string()),
+        // );
+
+        highest_score_key
+    }
+
+    pub fn brute_force_ciphertext(ciphertext: &[u8], key_length: u8) -> (Vec<u8>, Vec<u8>) {
+        // split ciphertext into key_length number of columns (each column will be xor'd with the same byte)
+        let chunks = ciphertext_to_chunks(ciphertext, key_length);
+        let mut columns: Vec<Vec<u8>> = transpose(chunks.clone());
+
+        // solve each column as a single key xor with lowest hamming distance between them
+        let potential_key: Vec<u8> = columns
+            .clone()
+            .iter()
+            .map(|column| guess_xord_key(column.as_slice()))
+            .collect();
+
+        // decrypt the ciphertext using the potential key
+        let mut potential_plaintext = Vec::with_capacity(ciphertext.len());
+        for (index, letter) in ciphertext.iter().enumerate() {
+            potential_plaintext.push(letter ^ potential_key[index % key_length as usize] as u8);
+        }
+
+        (potential_plaintext, potential_key)
+    }
+
+    #[test]
+    fn hamming_distance_works() {
+        let string1 = "this is a test";
+        let string2 = "wokka wokka!!!";
+
+        let bytes1 = string1.as_bytes();
+        let bytes2 = string2.as_bytes();
+
+        assert_eq!(hamming_distance(bytes1, bytes2), 37);
+    }
+
     /// Returns table of character frequencies for the English language.
-    /// ```
-    /// use cryptopals::vigenere_breaker::character_frequency;
-    /// assert_eq!(character_frequency('a'), 0.08167f32);
-    /// assert_eq!(character_frequency('7'), 0f32);
-    /// ```
     fn character_frequency(byte: u8) -> f32 {
         let char_freq: HashMap<u8, f32> = HashMap::from([
             (32, 0.167564443682168),
@@ -290,177 +452,24 @@ pub mod vigenere_breaker {
         *char_freq.get(&byte).unwrap_or(&0f32)
     }
 
-    /// statistical likelihood that a potential ciphertext is english based on letter frequency;
-    /// lower means higher likelyhood of ciphertext being the plaintext
-    pub fn delta_from_average_english_character_frequency(
-        potential_plaintext_column: &[u8],
-    ) -> f32 {
-        // println!(
-        //     "potential_plaintext: {}",
-        //     String::from_utf8(potential_plaintext.to_owned()).unwrap_or("shit!".to_string())
-        // );
-        let mut overall_delta = 0.0f32;
-        let mut char_count = HashMap::with_capacity(26);
-
-        // get frequency of each letter
-        for letter in potential_plaintext_column {
-            let mut letter_count = char_count.entry(*letter).or_insert(0f32);
-            *letter_count += 1f32;
-        }
-
-        // print number of valid characters
-        // println!(
-        //     "Number of valid characters: {}",
-        //     potential_plaintext.len() - invalid_characters
-        // );
-        // println!("INVALID CHARACTERS: {:?}", invalid_characters);
-
-        // normalize count
-        for count in char_count.values_mut() {
-            *count /= (potential_plaintext_column.len()) as f32;
-        }
-
-        // compute and return delta
-        // TODO absolute value
-        for (letter, frequency) in char_count.drain() {
-            let mut single_char_delta = character_frequency(letter) - frequency;
-
-            if single_char_delta < 0f32 {
-                single_char_delta *= -1f32;
-            }
-
-            // println!(
-            //     "CHAR: {}, FREQ: {}, EXPECTED_FREQ: {}, DELTA: {}",
-            //     letter as char,
-            //     frequency,
-            //     character_frequency(letter),
-            //     single_char_delta,
-            // );
-
-            overall_delta += single_char_delta
-        }
-
-        overall_delta
-    }
-
-    /// Returns the most likely character of a single key xor'd ciphertext based on the frequency of letters
-    pub fn guess_xord_key(ciphertext: &[u8]) -> u8 {
-        // new map storing char to english word score
-        let mut char_score = HashMap::with_capacity(255);
-        let mut decrypted_ciphertext = HashMap::with_capacity(255);
-
-        // insert char and score distance of unedited ciphertext
-        let mut highest_score_key = 0u8;
-        let mut highest_score = delta_from_average_english_character_frequency(ciphertext.into());
-        char_score.insert(highest_score_key, highest_score);
-
-        // insert key and score of ciphertext xor every key 'a' through 'Z'
-        for potential_key in 0..=255 as u8 {
-            let potential_plaintext = ciphertext
-                .to_owned()
-                .iter()
-                .map(|letter| (*letter as u8 ^ potential_key))
-                .collect::<Vec<u8>>();
-
-            decrypted_ciphertext.insert(potential_key, potential_plaintext.clone());
-
-            let potential_key_score =
-                delta_from_average_english_character_frequency(potential_plaintext.as_slice());
-            if potential_key_score < highest_score {
-                highest_score_key = potential_key;
-                highest_score = potential_key_score;
-            }
-
-            char_score.insert(potential_key, potential_key_score);
-        }
-
-        let highest_key_ciphertext = decrypted_ciphertext
-            .get(&highest_score_key)
-            .unwrap()
-            .to_owned();
-
-        decrypted_ciphertext.drain().for_each(|(key, value)| {
-            println!(
-                "KEY {}: DELTA: {}, TEXT: {}",
-                key,
-                delta_from_average_english_character_frequency(value.as_slice()),
-                String::from_utf8(value).unwrap_or("".to_string()),
-            );
-        });
-
-        println!(
-            "HIGHEST CHAR SCORE and test: {}, {}, {}",
-            highest_score_key,
-            highest_score,
-            String::from_utf8(highest_key_ciphertext).unwrap_or("default".to_string()),
-        );
-
-        highest_score_key
-    }
-
-    pub fn brute_force_keys(ciphertext: &[u8], key_length: u8) {
-        let chunks = ciphertext_to_chunks(ciphertext, key_length);
-
-        println!("CHUNKS: {:?}", chunks);
-
-        let mut columns: Vec<Vec<u8>> = transpose(chunks.clone());
-        // print first column
-        // println!(
-        //     "First column: {}",
-        //     String::from_utf8(columns.get(0).unwrap().clone()).unwrap_or("shit!".to_string())
-        // );
-
-        // solve each column as a single key xor with lowest hamming distance between them
-        let potential_key: Vec<u8> = columns
-            .clone()
-            .iter()
-            .map(|column| guess_xord_key(column.as_slice()))
-            .collect();
-
-        println!("KEY: {:?}", potential_key);
-
-        // decrypt the ciphertext using the potential key
-        let mut plaintext = Vec::with_capacity(ciphertext.len());
-        for (index, letter) in ciphertext.iter().enumerate() {
-            plaintext.push(letter ^ potential_key[index % key_length as usize] as u8);
-        }
-
-        // print the plaintext
-        println!(
-            "PLAINTEXT: {}",
-            String::from_utf8(plaintext).unwrap_or("shit!".to_string())
-        );
-    }
-
     #[test]
-    fn hamming_distance_works() {
-        let string1 = "this is a test";
-        let string2 = "wokka wokka!!!";
-
-        let bytes1 = string1.as_bytes();
-        let bytes2 = string2.as_bytes();
-
-        assert_eq!(hamming_distance(bytes1, bytes2), 37);
-    }
-
-    #[test]
-    fn test_delta_english_character_frequency() {
+    fn test_delta_from_english() {
         let potential_plaintext = String::from("The very first well-documented description of a polyalphabetic cipher was by Leon Battista Alberti around 1467 and used a metal");
         println!(
             "plaintext: {}",
-            delta_from_average_english_character_frequency(potential_plaintext.as_bytes())
+            delta_from_english(potential_plaintext.as_bytes())
         );
 
         let not_likely_plaintext = String::from("Dlc fipi jgbwr gijv-hmmykorroh bowabmndmmx sd k tmvcyvtfkfcdma mmnrip geq lc Josl Lerdmqde Yvfcbxg kvmerb 1467 krb ewcn e koxyv");
         println!(
             "not plaintext: {}",
-            delta_from_average_english_character_frequency(not_likely_plaintext.as_bytes())
+            delta_from_english(not_likely_plaintext.as_bytes())
         );
 
         let not_plaintext = String::from("Cmm znwg jrwax fjtp-mtkyvjvxni libhzmyyqsw tn e yttcjqxljgmxrh kmymmv ffa fh Qmsw Gixcnaxj Ftfnwbm jwwywi 1467 irm zaim f uicft");
         println!(
             "not plaintext: {}",
-            delta_from_average_english_character_frequency(not_plaintext.as_bytes())
+            delta_from_english(not_plaintext.as_bytes())
         );
     }
 }
