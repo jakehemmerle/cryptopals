@@ -94,7 +94,7 @@ mod one_through_five {
 mod aes_ecb_tests {
     #[test]
     fn decrypt_ecb_ciphertext() {
-        use crate::set_one::aes_ecb::AesEcb128;
+        use crate::aes_ecb::AesEcb128;
         use crate::utils::parse_file_base64;
 
         let ciphertext = parse_file_base64("src/set_one/1-7.txt");
@@ -105,54 +105,5 @@ mod aes_ecb_tests {
         let plaintext = cipher.decrypt(&ciphertext.as_slice());
 
         println!("PLAINTEXT:\n\n{}", String::from_utf8(plaintext).unwrap());
-    }
-}
-
-#[allow(dead_code)]
-pub mod aes_ecb {
-    use aes::{
-        cipher::{generic_array::GenericArray, BlockDecrypt, KeyInit},
-        Aes128, Block,
-    };
-
-    pub struct AesEcb128 {
-        key: Block,
-        cipher: Aes128,
-    }
-
-    impl AesEcb128 {
-        pub fn new(key: &[u8]) -> Self {
-            assert!(key.len() <= 16);
-
-            let mut key_array = GenericArray::from([0u8; 16]);
-            key_array.copy_from_slice(key);
-
-            let cipher = Aes128::new(&key_array);
-
-            AesEcb128 {
-                key: key_array,
-                cipher,
-            }
-        }
-
-        pub fn decrypt(&self, ciphertext: &[u8]) -> Vec<u8> {
-            let encrypted_blocks = ciphertext.chunks(16);
-
-            // allocate mutable buffer
-            let mut plaintext = Vec::<Block>::with_capacity(encrypted_blocks.len());
-
-            // fill buffer
-            plaintext.extend(
-                encrypted_blocks
-                    .map(|block| Block::clone_from_slice(block))
-                    .collect::<Vec<Block>>(),
-            );
-
-            // decrypt (parallelizable)
-            self.cipher.decrypt_blocks(&mut plaintext);
-
-            // flatten out of blocks, same length as the slice
-            plaintext.into_iter().flatten().collect::<Vec<u8>>()
-        }
     }
 }
