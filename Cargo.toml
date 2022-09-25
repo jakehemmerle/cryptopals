@@ -10,7 +10,6 @@ edition = "2021"
 base64 = "*"
 hex = "*"
 itertools = "*"
-# aes = "*"
-# rust-crypto = "*"
+aes = "*"
 # nalgebra = "*"
 # log = { version = "0.4", features = [] }
