@@ -1,9 +1,10 @@
-use ::aes::cipher::{generic_array::GenericArray, typenum::U16, Block};
+use ::aes::cipher::{generic_array::GenericArray, typenum::U16};
 use itertools::Itertools;
 
 mod aes;
 
 /// 2.1
+#[allow(dead_code)]
 pub fn pkcs_padding(input: &[u8], block_size: usize) -> Vec<u8> {
     let mut output = input.to_vec();
     let padding = block_size - (input.len() % block_size);
@@ -21,7 +22,7 @@ fn test_pkcs_padding() {
 /// 2.2
 #[test]
 fn aes_cbc_decrypt() {
-    use crate::set_two::aes::{Block, CipherMode, AES128};
+    use crate::set_two::aes::{CipherMode, AES128};
     use std::fs;
 
     let ciphertext = input_to_blocks(
@@ -55,6 +56,7 @@ fn aes_cbc_decrypt() {
 }
 
 /// this generates an output buffer from the block count (assuming 16-byte blocks)
+#[allow(dead_code)]
 pub fn output_from_block_count(block_count: usize) -> Vec<GenericArray<u8, U16>> {
     let mut plain = Vec::<u8>::with_capacity(block_count * 16);
     for _ in 0..(block_count * 16) {
@@ -70,6 +72,7 @@ pub fn output_from_block_count(block_count: usize) -> Vec<GenericArray<u8, U16>>
 }
 
 /// This turns a slice of bytes (eg ciphertext) into 16 byte blocks ready for encryption;
+#[allow(dead_code)]
 pub fn input_to_blocks(input: &[u8]) -> Vec<GenericArray<u8, U16>> {
     let mut output = Vec::<u8>::with_capacity(input.len());
     output.extend_from_slice(input);
@@ -84,3 +87,5 @@ pub fn input_to_blocks(input: &[u8]) -> Vec<GenericArray<u8, U16>> {
 
     blocks
 }
+
+// 2.3

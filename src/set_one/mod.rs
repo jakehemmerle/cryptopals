@@ -95,9 +95,9 @@ mod one_through_five {
 }
 
 mod aes_ecb_tests {
-    use crate::set_one::aes_ecb::*;
     #[test]
     fn decrypt_ecb_ciphertext() {
+        use crate::set_one::aes_ecb::*;
         use crate::utils::parse_file_base64;
 
         let ciphertext = parse_file_base64("src/set_one/1-7.txt");
@@ -115,7 +115,6 @@ mod aes_ecb_tests {
     fn find_ecb_ciphertext_from_many() {
         use crate::repeating_key_xor::hamming_distance;
         use itertools::Itertools;
-        use std::collections::BTreeMap;
         use std::fs;
 
         let mut ciphertexts = fs::read_to_string("src/set_one/1-8.txt")
@@ -134,7 +133,7 @@ mod aes_ecb_tests {
             let mut hamming_distances = Vec::<(usize, f32)>::with_capacity(ciphertexts.len());
 
             for (index, ciphertext) in ciphertexts.iter().enumerate() {
-                let mut blocks = ciphertext
+                let blocks = ciphertext
                     .chunks_exact(blocksize)
                     .collect_vec()
                     .into_iter()

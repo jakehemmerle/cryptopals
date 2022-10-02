@@ -1,6 +1,7 @@
 #[allow(dead_code)]
 pub use aes_ecb::*;
 
+#[allow(dead_code)]
 pub mod aes_ecb {
     use aes::{
         cipher::{generic_array::GenericArray, BlockDecrypt, KeyInit},

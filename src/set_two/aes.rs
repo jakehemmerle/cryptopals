@@ -2,15 +2,11 @@ pub use self::aes::*;
 
 #[allow(dead_code)]
 pub mod aes {
-    use std::io::Read;
-
     pub use ::aes::Block;
     use ::aes::{
         cipher::{generic_array::GenericArray, BlockDecrypt, BlockEncrypt, KeyInit},
         Aes128,
     };
-    use aes::cipher::{generic_array::ArrayLength, typenum::U16, Key};
-    use itertools::Itertools;
 
     pub const BLOCK_SIZE_BYTES: usize = 16;
 
@@ -61,10 +57,7 @@ pub mod aes {
                         self.cipher.decrypt_block(out_block);
 
                         // xor output with prev block/iv
-                        for (out, (prev, enc_byte)) in out_block
-                            .iter_mut()
-                            .zip(prev_block.iter().zip(ciphertext_block.iter()))
-                        {
+                        for (out, prev) in out_block.iter_mut().zip(prev_block.iter()) {
                             *out ^= *prev;
                         }
                         // update prev block
@@ -96,10 +89,7 @@ pub mod aes {
                         out_block.copy_from_slice(plaintext_block);
 
                         // xor buffer with prev block/iv
-                        for (out, (prev, enc_byte)) in out_block
-                            .iter_mut()
-                            .zip(prev_block.iter().zip(plaintext_block.iter()))
-                        {
+                        for (out, prev) in out_block.iter_mut().zip(prev_block.iter()) {
                             *out ^= *prev;
                         }
 
