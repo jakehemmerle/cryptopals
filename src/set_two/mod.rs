@@ -1,7 +1,3 @@
-use ::aes::cipher::{generic_array::GenericArray, typenum::U16};
-use ::aes::Block;
-use itertools::Itertools;
-
 mod aes;
 
 /// 2.1
@@ -13,6 +9,7 @@ pub fn pkcs_padding(input: &[u8], block_size: usize) -> Vec<u8> {
     output
 }
 
+/// 2.1
 #[test]
 fn test_pkcs_padding() {
     let input = b"YELLOW SUBMARINE";
@@ -25,6 +22,7 @@ fn test_pkcs_padding() {
 fn aes_cbc_decrypt() {
     use crate::set_two::aes::{CipherMode, AES128};
     use crate::utils::*;
+    use ::aes::cipher::{generic_array::GenericArray, typenum::U16};
     use std::fs;
 
     let ciphertext = input_to_padded_blocks(
@@ -61,9 +59,9 @@ fn aes_cbc_decrypt() {
 mod detection_oracle {
     use crate::set_two::aes::*;
     use crate::utils::*;
-    use rand::prelude::*;
 
     // pub struct RandomEncryptor {}
+    #[allow(dead_code)]
     pub fn random_encryptor(plaintext: &[u8]) -> Vec<Block> {
         // generate randon key and blockmode
         let random_key = Block::from(rand::random::<[u8; 16]>());
