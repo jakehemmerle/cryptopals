@@ -1,4 +1,5 @@
 use ::aes::cipher::{generic_array::GenericArray, typenum::U16};
+use ::aes::Block;
 use itertools::Itertools;
 
 mod aes;
@@ -23,9 +24,10 @@ fn test_pkcs_padding() {
 #[test]
 fn aes_cbc_decrypt() {
     use crate::set_two::aes::{CipherMode, AES128};
+    use crate::utils::*;
     use std::fs;
 
-    let ciphertext = input_to_blocks(
+    let ciphertext = input_to_padded_blocks(
         base64::decode(
             fs::read_to_string("src/set_two/2-2.txt")
                 .unwrap()
@@ -55,37 +57,78 @@ fn aes_cbc_decrypt() {
     });
 }
 
-/// this generates an output buffer from the block count (assuming 16-byte blocks)
-#[allow(dead_code)]
-pub fn output_from_block_count(block_count: usize) -> Vec<GenericArray<u8, U16>> {
-    let mut plain = Vec::<u8>::with_capacity(block_count * 16);
-    for _ in 0..(block_count * 16) {
-        plain.push(0);
-    }
-    let plaintext = plain
-        .chunks(16)
-        .into_iter()
-        .map(|c| GenericArray::<u8, U16>::clone_from_slice(c))
-        .collect_vec();
-
-    plaintext
-}
-
-/// This turns a slice of bytes (eg ciphertext) into 16 byte blocks ready for encryption;
-#[allow(dead_code)]
-pub fn input_to_blocks(input: &[u8]) -> Vec<GenericArray<u8, U16>> {
-    let mut output = Vec::<u8>::with_capacity(input.len());
-    output.extend_from_slice(input);
-    let padding = 16 - (input.len() % 16);
-    output.extend(vec![42u8; padding]);
-
-    let blocks = output
-        .chunks(16)
-        .into_iter()
-        .map(|c| GenericArray::<u8, U16>::clone_from_slice(c))
-        .collect_vec();
-
-    blocks
-}
-
 // 2.3
+mod detection_oracle {
+    use crate::set_two::aes::*;
+    use crate::utils::*;
+    use rand::prelude::*;
+
+    // pub struct RandomEncryptor {}
+    pub fn random_encryptor(plaintext: &[u8]) -> Vec<Block> {
+        // generate randon key and blockmode
+        let random_key = Block::from(rand::random::<[u8; 16]>());
+        let encryption_mode_is_ecb = rand::random::<bool>();
+        println!(
+            "SECRET!: encryption mode is {}",
+            if encryption_mode_is_ecb { "ECB" } else { "CBC" }
+        );
+        println!();
+
+        // generate random length suffix
+        let suffix_len = (rand::random::<u8>() % 5) + 5;
+        let mut suffix = Vec::<u8>::with_capacity(suffix_len as usize);
+        for _ in 0..suffix_len {
+            suffix.push(rand::random::<u8>());
+        }
+
+        // generate random length prefix
+        let prefix_len = (rand::random::<u8>() % 5) + 5;
+        let mut prefix = Vec::<u8>::with_capacity(prefix_len as usize);
+        for _ in 0..prefix_len {
+            prefix.push(rand::random::<u8>());
+        }
+
+        // add prefix and suffix to plaintext
+        let mut plaintext_with_rand_bytes =
+            Vec::<u8>::with_capacity(plaintext.len() + prefix_len as usize + suffix_len as usize);
+        plaintext_with_rand_bytes.extend(prefix);
+        plaintext_with_rand_bytes.extend(plaintext);
+        plaintext_with_rand_bytes.extend(suffix);
+
+        // generate input and outputs for cipher
+        let (input, mut output) = text_to_io(plaintext_with_rand_bytes);
+
+        let cipher: AES128;
+        if encryption_mode_is_ecb {
+            // encrypt with ecb
+            cipher = AES128::new(CipherMode::ECB, &random_key);
+            cipher.encrypt(input.as_slice(), output.as_mut_slice())
+        } else {
+            // encrypt with cbc
+            let random_iv = Block::from(rand::random::<[u8; 16]>());
+            cipher = AES128::new(CipherMode::CBC(random_iv), &random_key);
+            cipher.encrypt(input.as_slice(), output.as_mut_slice())
+        }
+
+        // return ciphertext
+        output
+    }
+
+    /// 2.3
+    #[test]
+    fn test_random_encryptor() {
+        let random_input = [0u8; 64];
+        let ciphertext = random_encryptor(&random_input);
+        println!("ciphertext:");
+        for block in ciphertext.iter() {
+            println!("{:?}", block);
+        }
+
+        println!();
+        if ciphertext[2] == ciphertext[3] {
+            println!("Detected mode: ECB");
+        } else {
+            println!("Detected mode: CBC");
+        }
+    }
+}
