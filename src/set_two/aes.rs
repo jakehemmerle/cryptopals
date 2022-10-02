@@ -4,9 +4,10 @@ pub use self::aes::*;
 pub mod aes {
     use std::io::Read;
 
+    pub use ::aes::Block;
     use ::aes::{
         cipher::{generic_array::GenericArray, BlockDecrypt, BlockEncrypt, KeyInit},
-        Aes128, Block,
+        Aes128,
     };
     use aes::cipher::{generic_array::ArrayLength, typenum::U16, Key};
     use itertools::Itertools;
@@ -24,7 +25,7 @@ pub mod aes {
         ECB,
         /// CBC needs an initialization vector
         /// @John is it safe/required to store IV in the struct?
-        CBC(GenericArray<u8, U16>),
+        CBC(Block),
     }
 
     impl AES128 {
@@ -50,68 +51,77 @@ pub mod aes {
             match self.cipher_mode {
                 CipherMode::CBC(iv) => {
                     let mut prev_block = GenericArray::from(iv.clone());
-                    for (ciphertext_block, out) in ciphertext.iter().zip(out.iter_mut()) {
-                        out.copy_from_slice(ciphertext_block);
-                        self.cipher.decrypt_block(out);
-                        for (out, (prev, enc_byte)) in out
+
+                    // zip ciphertext with output
+                    for (ciphertext_block, out_block) in ciphertext.iter().zip(out.iter_mut()) {
+                        // copy ciphertext block to output
+                        out_block.copy_from_slice(ciphertext_block);
+
+                        // decrypt output
+                        self.cipher.decrypt_block(out_block);
+
+                        // xor output with prev block/iv
+                        for (out, (prev, enc_byte)) in out_block
                             .iter_mut()
                             .zip(prev_block.iter().zip(ciphertext_block.iter()))
                         {
                             *out ^= *prev;
                         }
+                        // update prev block
                         prev_block = *ciphertext_block;
                     }
                 }
-                CipherMode::ECB => todo!(),
+                CipherMode::ECB => {
+                    // copy ciphertext into output
+                    for (ciphertext_block, out) in ciphertext.iter().zip(out.iter_mut()) {
+                        out.copy_from_slice(ciphertext_block);
+                    }
+                    // parallel decrypt
+                    self.cipher.decrypt_blocks(out);
+                }
             }
         }
 
-        // /// Encrypts a block based on what
-        // pub fn encrypt(&self, plaintext: &[Block], out: &mut [Block]) {
-        //     assert!(out.len() >= plaintext.len());
+        /// Encrypts a slice of Blocks into a provided output buffer
+        /// UNTESTSED
+        pub fn encrypt(&self, plaintext: &[Block], out: &mut [Block]) {
+            assert!(out.len() >= plaintext.len());
 
-        //     match self.cipher_mode {
-        //         CipherMode::CBC(iv) => {
-        //             let mut prev_block = GenericArray::<u8, U16>::from(iv);
-        //             let plaintext_chunks = plaintext
-        //                 .chunks(BLOCK_SIZE_BYTES)
-        //                 .map(|block| Block::from_slice(block))
-        //                 .collect_vec();
-        //             let out_chunks = out
-        //                 .chunks_mut(BLOCK_SIZE_BYTES)
-        //                 .map(|block| Block::from_mut_slice(block))
-        //                 .collect_vec();
+            match self.cipher_mode {
+                CipherMode::CBC(iv) => {
+                    let mut prev_block = Block::from(iv);
 
-        //             for (plaintext_block, out_block) in
-        //                 plaintext_chunks.iter().zip(out_chunks).into_iter()
-        //             {
-        //                 let mut in_block = GenericArray::<u8, U16>::clone_from_slice(&iv);
-        //                 for (index, (in_byte, plaintext_byte)) in
-        //                     in_block.iter_mut().zip(plaintext_block.iter()).enumerate()
-        //                 {
-        //                     *in_byte = plaintext_byte ^ prev_block.get(index).unwrap()
-        //                 }
+                    for (plaintext_block, out_block) in plaintext.iter().zip(out).into_iter() {
+                        // copy plaintext block to buffer
+                        out_block.copy_from_slice(plaintext_block);
 
-        //                 self.cipher.encrypt(&in_block, out_block);
-        //                 prev_block.copy_from_slice(out_block);
-        //             }
-        //         }
-        //         ECB => {
-        //             let ciphertext_chunks = plaintext
-        //                 .chunks(BLOCK_SIZE_BYTES)
-        //                 .map(|block| Block::from(block))
-        //                 .collect_vec();
-        //             let out_chunks = out
-        //                 .chunks_mut(BLOCK_SIZE_BYTES)
-        //                 .map(|block| Block::from_mut_slice(block))
-        //                 .collect_vec();
+                        // xor buffer with prev block/iv
+                        for (out, (prev, enc_byte)) in out_block
+                            .iter_mut()
+                            .zip(prev_block.iter().zip(plaintext_block.iter()))
+                        {
+                            *out ^= *prev;
+                        }
 
-        //             self.cipher.decrypt_blocks_b2b(
-        //                 ciphertext_chunks.as_slice(),
-        //                 out_chunks.as_mut_slice(),
-        //             );
-        //         }
-        //     }
-        // }
+                        // encrypt the block
+                        self.cipher.encrypt_block(out_block);
+
+                        // update prev block
+                        prev_block = *out_block;
+                    }
+                }
+                CipherMode::ECB => {
+                    // copy plaintext into output
+                    for (plaintext_block, out_block) in
+                        plaintext.iter().zip(out.iter_mut()).into_iter()
+                    {
+                        out_block.copy_from_slice(plaintext_block);
+                    }
+
+                    // parallel encrypt
+                    self.cipher.encrypt_blocks(out);
+                }
+            }
+        }
     }
 }

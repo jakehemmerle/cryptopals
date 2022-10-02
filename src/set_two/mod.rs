@@ -21,20 +21,18 @@ fn test_pkcs_padding() {
 /// 2.2
 #[test]
 fn aes_cbc_decrypt() {
-    use crate::set_two::aes::{CipherMode, AES128};
-    use ::aes::{Aes128, Block};
+    use crate::set_two::aes::{Block, CipherMode, AES128};
     use std::fs;
 
-    let ciphertext = base64::decode(
-        fs::read_to_string("src/set_two/2-2.txt")
-            .unwrap()
-            .replace("\n", ""),
-    )
-    .unwrap()
-    .chunks(16)
-    .into_iter()
-    .map(|c| Block::clone_from_slice(c))
-    .collect_vec();
+    let ciphertext = input_to_blocks(
+        base64::decode(
+            fs::read_to_string("src/set_two/2-2.txt")
+                .unwrap()
+                .replace("\n", ""),
+        )
+        .unwrap()
+        .as_ref(),
+    );
 
     let key = b"YELLOW SUBMARINE";
     let iv = GenericArray::<u8, U16>::from([0u8; 16]);
@@ -42,25 +40,47 @@ fn aes_cbc_decrypt() {
     let cipher = AES128::new(CipherMode::CBC(iv), key);
 
     // fill plaintext with zeros
-    let mut plaintext = Vec::<u8>::with_capacity(ciphertext.len() * 16);
-    for _ in 0..(ciphertext.len() * 16) {
-        plaintext.push(0);
-    }
-
-    let mut plain = plaintext
-        .chunks(16)
-        .into_iter()
-        .map(|c| Block::clone_from_slice(c))
-        .collect_vec();
+    let mut plaintext = output_from_block_count(ciphertext.len());
 
     // print plaintext
-    cipher.decrypt(ciphertext.as_slice(), plain.as_mut_slice());
+    cipher.decrypt(ciphertext.as_slice(), plaintext.as_mut_slice());
 
     // println!("plaintext after: {:?}", plain);
-    plain.iter().for_each(|block| {
+    plaintext.iter().for_each(|block| {
         println!(
             "{}",
             String::from_utf8(block.to_vec()).unwrap_or_else(|_| "invalid utf8".to_string())
         )
     });
+}
+
+/// this generates an output buffer from the block count (assuming 16-byte blocks)
+pub fn output_from_block_count(block_count: usize) -> Vec<GenericArray<u8, U16>> {
+    let mut plain = Vec::<u8>::with_capacity(block_count * 16);
+    for _ in 0..(block_count * 16) {
+        plain.push(0);
+    }
+    let plaintext = plain
+        .chunks(16)
+        .into_iter()
+        .map(|c| GenericArray::<u8, U16>::clone_from_slice(c))
+        .collect_vec();
+
+    plaintext
+}
+
+/// This turns a slice of bytes (eg ciphertext) into 16 byte blocks ready for encryption;
+pub fn input_to_blocks(input: &[u8]) -> Vec<GenericArray<u8, U16>> {
+    let mut output = Vec::<u8>::with_capacity(input.len());
+    output.extend_from_slice(input);
+    let padding = 16 - (input.len() % 16);
+    output.extend(vec![42u8; padding]);
+
+    let blocks = output
+        .chunks(16)
+        .into_iter()
+        .map(|c| GenericArray::<u8, U16>::clone_from_slice(c))
+        .collect_vec();
+
+    blocks
 }
