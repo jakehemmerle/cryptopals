@@ -1,4 +1,7 @@
 // 1.6
+
+mod aes_ecb;
+
 mod repeating_key_xor_tests {
     /// This brute forces some dummy data
     #[test]
@@ -92,9 +95,9 @@ mod one_through_five {
 }
 
 mod aes_ecb_tests {
+    use crate::set_one::aes_ecb::*;
     #[test]
     fn decrypt_ecb_ciphertext() {
-        use crate::aes_ecb::AesEcb128;
         use crate::utils::parse_file_base64;
 
         let ciphertext = parse_file_base64("src/set_one/1-7.txt");
@@ -105,5 +108,78 @@ mod aes_ecb_tests {
         let plaintext = cipher.decrypt(&ciphertext.as_slice());
 
         println!("PLAINTEXT:\n\n{}", String::from_utf8(plaintext).unwrap());
+    }
+
+    // 1-8
+    #[test]
+    fn find_ecb_ciphertext_from_many() {
+        use crate::repeating_key_xor::hamming_distance;
+        use itertools::Itertools;
+        use std::collections::BTreeMap;
+        use std::fs;
+
+        let mut ciphertexts = fs::read_to_string("src/set_one/1-8.txt")
+            .unwrap()
+            .split("\n")
+            .collect::<Vec<&str>>()
+            .into_iter()
+            .map(|line| hex::decode(line).unwrap())
+            .collect::<Vec<Vec<u8>>>();
+
+        // get rid of last, empty line
+        ciphertexts.pop();
+
+        // break each ciphertext into 16 byte blocks and print the hamming distance between each block
+        for blocksize in [16usize, 32, 48, 64, 80].into_iter() {
+            let mut hamming_distances = Vec::<(usize, f32)>::with_capacity(ciphertexts.len());
+
+            for (index, ciphertext) in ciphertexts.iter().enumerate() {
+                let mut blocks = ciphertext
+                    .chunks_exact(blocksize)
+                    .collect_vec()
+                    .into_iter()
+                    .combinations(2)
+                    .collect::<Vec<Vec<&[u8]>>>();
+                let mut distance: f32 = 0f32;
+
+                let blocks_len = blocks.len();
+
+                for combination in blocks {
+                    distance +=
+                        hamming_distance(combination[0], combination[1]) as f32 / blocksize as f32;
+                }
+
+                hamming_distances.push((index, distance as f32 / blocks_len as f32));
+            }
+
+            hamming_distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+
+            let mut hamming_distances = hamming_distances.into_iter();
+
+            let (line, hamming_distance) = hamming_distances.next().unwrap();
+            println!(
+                "blocksize: {}\nmost likely line number: {}\nweighted hamming distance of blocks: {}",
+                blocksize,
+                line,
+                hamming_distance
+            );
+            println!("blocks:");
+            for block in ciphertexts[line].chunks_exact(blocksize) {
+                println!("{}", hex::encode(block));
+            }
+            println!("\n");
+
+            let (line, hamming_distance) = hamming_distances.next().unwrap();
+            println!("next highest weighted line info:");
+            println!(
+                "blocksize: {}\nline number: {}\nweighted hamming distance of blocks: {}",
+                blocksize, line, hamming_distance
+            );
+            println!("blocks:");
+            for block in ciphertexts[line].chunks_exact(blocksize) {
+                println!("{}", hex::encode(block));
+            }
+            println!("\n");
+        }
     }
 }

@@ -1,6 +1,6 @@
 // This is an isolated module for cracking rotating-key xor ciphers
 
-pub use repeating_key_xor::{brute_force_ciphertext, guess_key_length};
+pub use repeating_key_xor::*;
 
 pub mod repeating_key_xor {
     use std::collections::HashMap;
@@ -77,7 +77,7 @@ pub mod repeating_key_xor {
     }
 
     /// Returns the number of bits that are different between two byte slices.
-    fn hamming_distance(bytes1: &[u8], bytes2: &[u8]) -> usize {
+    pub fn hamming_distance(bytes1: &[u8], bytes2: &[u8]) -> usize {
         assert!(bytes1.len() == bytes2.len());
         bytes1.iter().zip(bytes2.iter()).fold(0, |acc, (a, b)| {
             let mut distance: usize = 0;
