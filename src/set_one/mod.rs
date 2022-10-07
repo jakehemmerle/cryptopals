@@ -8,11 +8,11 @@ mod repeating_key_xor_tests {
     fn brute_force_dummy_data() {
         use crate::repeating_key_xor::*;
 
-        let ciphertext = hex::decode("1729316330212a223f6323262c363a63273b3b613e362c242625742c37313161202b24742f202d63253b246f740a6123222f2063353b6323316320362f2474372e742f282226613d2d613563253b332474332d352024742a2f740d181763363d372974092e3c2d6f740a66396331262635203a613236223f2a2f336332202c2a31276f7417293d30613d3061332c283a2461202c613626613563262626202063353d2e247a".to_string()).unwrap();
+        let ciphertext = hex::decode("1729316330212a223f6323262c363a63273b3b613e362c242625742c37313161202b24742f202d63253b246f740a6123222f2063353b6323316320362f2474372e742f282226613d2d613563253b332474332d352024742a2f740d181763363d372974092e3c2d6f740a66396331262635203a613236223f2a2f336332202c2a31276f7417293d30613d3061332c283a2461202c613626613563262626202063353d2e247a").unwrap();
         let key_lengths = guess_key_length(&ciphertext, 5);
 
         for key_length in key_lengths {
-            let (plaintext, key) = brute_force_ciphertext(&ciphertext.as_slice(), key_length);
+            let (plaintext, key) = brute_force_ciphertext(ciphertext.as_slice(), key_length);
 
             println!(
                 "KEY:\n\"{}\"\n{:?}\n",
@@ -35,10 +35,10 @@ mod repeating_key_xor_tests {
 
         let file = fs::read_to_string("src/set_one/1-6.txt")
             .expect("Should have been able to read the file");
-        let ciphertext = base64::decode(file.replace("\n", "")).unwrap();
+        let ciphertext = base64::decode(file.replace('\n', "")).unwrap();
         let key_lengths = guess_key_length(&ciphertext, 40);
 
-        let (plaintext, key) = brute_force_ciphertext(&ciphertext.as_slice(), key_lengths[0]);
+        let (plaintext, key) = brute_force_ciphertext(ciphertext.as_slice(), key_lengths[0]);
 
         println!(
             "KEY:\n\"{}\"\n{:?}\n",
@@ -105,7 +105,7 @@ mod aes_ecb_tests {
 
         let cipher = AesEcb128::new(key);
 
-        let plaintext = cipher.decrypt(&ciphertext.as_slice());
+        let plaintext = cipher.decrypt(ciphertext.as_slice());
 
         println!("PLAINTEXT:\n\n{}", String::from_utf8(plaintext).unwrap());
     }
@@ -119,7 +119,7 @@ mod aes_ecb_tests {
 
         let mut ciphertexts = fs::read_to_string("src/set_one/1-8.txt")
             .unwrap()
-            .split("\n")
+            .split('\n')
             .collect::<Vec<&str>>()
             .into_iter()
             .map(|line| hex::decode(line).unwrap())

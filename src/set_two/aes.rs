@@ -46,7 +46,7 @@ pub mod aes {
 
             match self.cipher_mode {
                 CipherMode::CBC(iv) => {
-                    let mut prev_block = GenericArray::from(iv.clone());
+                    let mut prev_block = iv;
 
                     // zip ciphertext with output
                     for (ciphertext_block, out_block) in ciphertext.iter().zip(out.iter_mut()) {
@@ -82,9 +82,9 @@ pub mod aes {
 
             match self.cipher_mode {
                 CipherMode::CBC(iv) => {
-                    let mut prev_block = Block::from(iv);
+                    let mut prev_block = iv;
 
-                    for (plaintext_block, out_block) in plaintext.iter().zip(out).into_iter() {
+                    for (plaintext_block, out_block) in plaintext.iter().zip(out) {
                         // copy plaintext block to buffer
                         out_block.copy_from_slice(plaintext_block);
 
@@ -103,7 +103,7 @@ pub mod aes {
                 CipherMode::ECB => {
                     // copy plaintext into output
                     for (plaintext_block, out_block) in
-                        plaintext.iter().zip(out.iter_mut()).into_iter()
+                        plaintext.iter().zip(out.iter_mut())
                     {
                         out_block.copy_from_slice(plaintext_block);
                     }

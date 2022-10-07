@@ -38,7 +38,7 @@ pub mod aes_ecb {
             // fill buffer
             plaintext.extend(
                 encrypted_blocks
-                    .map(|block| Block::clone_from_slice(block))
+                    .map(Block::clone_from_slice)
                     .collect::<Vec<Block>>(),
             );
 

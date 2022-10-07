@@ -29,7 +29,7 @@ fn aes_cbc_decrypt() {
         base64::decode(
             fs::read_to_string("src/set_two/2-2.txt")
                 .unwrap()
-                .replace("\n", ""),
+                .replace('\n', ""),
         )
         .unwrap()
         .as_ref(),
@@ -56,14 +56,12 @@ fn aes_cbc_decrypt() {
 }
 
 // 2.3
+#[allow(dead_code)]
 mod detection_oracle {
-    use ::aes::cipher::generic_array::GenericArray;
-
     use crate::set_two::aes::*;
     use crate::utils::*;
 
     // pub struct RandomEncryptor {}
-    #[allow(dead_code)]
     pub fn random_encryptor(plaintext: &[u8]) -> Vec<Block> {
         // generate randon key and blockmode
         let random_key = Block::from(rand::random::<[u8; 16]>());
@@ -135,6 +133,7 @@ mod detection_oracle {
 }
 
 // 2.4
+#[allow(dead_code)]
 mod byte_at_a_time {
     use crate::set_two::aes::{CipherMode, AES128};
     use crate::utils::*;
@@ -188,7 +187,7 @@ mod byte_at_a_time {
         // find the block size and offset
         let mut block_size = 0usize;
         let mut offset = 0u8;
-        let mut prev_ciphertext_size = encryptor
+        let prev_ciphertext_size = encryptor
             .generate_ciphertext("A".as_bytes())
             .into_iter()
             .fold(Vec::<u8>::new(), |mut acc, block| {
@@ -196,9 +195,9 @@ mod byte_at_a_time {
                 acc
             })
             .len();
-        for i in (0..128u8).into_iter() {
+        for i in 0..128u8 {
             let ciphertext = encryptor
-                .generate_ciphertext(String::from("A".repeat(i as usize)).as_bytes())
+                .generate_ciphertext("A".repeat(i as usize).as_bytes())
                 .into_iter()
                 .fold(Vec::<u8>::new(), |mut acc, block| {
                     acc.extend_from_slice(block.as_slice());
@@ -243,8 +242,8 @@ mod byte_at_a_time {
         let mut encrypted_ciphertexts = Vec::<Block>::with_capacity(space_buff.len());
 
         // // generate a vec of the ciphertexts you'll want to decrypt
-        for i in (0usize..space_buff.len()) {
-            let string = buff.pop();
+        for _i in 0usize..space_buff.len() {
+            let _string = buff.pop();
             let mut ciphertext = encryptor.generate_ciphertext(buff.as_slice());
             let get = ciphertext.remove(secret_block_count - 1);
             encrypted_ciphertexts.push(get);
@@ -282,7 +281,6 @@ mod byte_at_a_time {
 
                 // // if the blocks are equal, thats our character! save it!
                 if try_block == ciphertext_block {
-                    println!("yay!: {}", character);
                     decrypted_characters.push(character);
                     break;
                 }

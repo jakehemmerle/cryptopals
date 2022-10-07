@@ -9,7 +9,7 @@ pub mod utils {
         use std::fs;
 
         let file = fs::read_to_string(filename).unwrap();
-        base64::decode(file.replace("\n", "").as_bytes()).unwrap()
+        base64::decode(file.replace('\n', "").as_bytes()).unwrap()
     }
 
     /// this generates an output buffer from the block count (assuming 16-byte blocks)
@@ -22,7 +22,7 @@ pub mod utils {
         let output = empty_buffer
             .chunks(16)
             .into_iter()
-            .map(|c| GenericArray::<u8, U16>::clone_from_slice(c))
+            .map(GenericArray::<u8, U16>::clone_from_slice)
             .collect_vec();
 
         output
@@ -39,7 +39,7 @@ pub mod utils {
         let blocks = output
             .chunks(16)
             .into_iter()
-            .map(|c| GenericArray::<u8, U16>::clone_from_slice(c))
+            .map(GenericArray::<u8, U16>::clone_from_slice)
             .collect_vec();
 
         blocks
